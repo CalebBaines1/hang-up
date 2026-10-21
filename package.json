@@ -1,0 +1,19 @@
+{
+  "name": "hang-up",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hang Up: a scam call trainer. Practice calls from an AI scammer, then a coach's debrief.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @hangup/server --filter @hangup/web dev",
+    "build": "pnpm --filter @hangup/server build && pnpm --filter @hangup/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "start": "pnpm --filter @hangup/server start"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

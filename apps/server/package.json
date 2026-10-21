@@ -1,0 +1,29 @@
+{
+  "name": "@hangup/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist/index.js",
+    "start": "node --env-file-if-exists=../../.env dist/index.js",
+    "typecheck": "tsc -p .",
+    "test": "DB_PATH=:memory: node --test --import tsx test/*.test.ts",
+    "simulate": "tsx --env-file-if-exists=../../.env scripts/simulate-call.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.1",
+    "@fastify/websocket": "^11.3.4",
+    "fastify": "^5.12.7",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@hangup/client": "workspace:*",
+    "@types/node": "^26.6.5",
+    "@types/web-push": "^3.6.4",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
