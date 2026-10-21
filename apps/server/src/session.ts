@@ -80,7 +80,8 @@ export class CallSessionHandler {
     this.persona = getPersona(this.scenario.personaId);
     ws.on("message", (data, isBinary) => this.onMessage(data as Buffer, isBinary));
     ws.on("close", () => {
-      if (!this.ended) void this.end("disconnected");
+      // A socket that closes before "start" leaves the call ringing so the app can reconnect.
+      if (!this.ended && this.startedAt) void this.end("disconnected");
     });
   }
 

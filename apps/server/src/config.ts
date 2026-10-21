@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 const env = process.env;
 
 export const config = {
@@ -18,5 +20,5 @@ export const config = {
     subject: env.VAPID_SUBJECT ?? "mailto:hello@example.com",
   },
   maxCallMs: Number(env.MAX_CALL_MS ?? 4 * 60 * 1000),
-  webDir: env.WEB_DIR ?? "",
+  webDir: env.WEB_DIR ? resolve(env.WEB_DIR) : "",
 };

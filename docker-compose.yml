@@ -1,0 +1,27 @@
+# One box (for example a Nebius AI Cloud GPU VM) runs the whole app:
+#   docker compose up -d --build
+# then open http://<host>:8787. Put HTTPS in front of it for microphone access.
+services:
+  api:
+    build: .
+    ports:
+      - "8787:8787"
+    env_file: .env
+    environment:
+      SPEECH_URL: http://speech:8001
+    volumes:
+      - hangup-data:/data
+    depends_on:
+      - speech
+    restart: unless-stopped
+
+  speech:
+    build: services/speech
+    environment:
+      # Set to "cuda" on a GPU VM with the NVIDIA container toolkit
+      ONNX_PROVIDER: ${ONNX_PROVIDER:-cpu}
+      NUM_THREADS: ${SPEECH_THREADS:-4}
+    restart: unless-stopped
+
+volumes:
+  hangup-data:

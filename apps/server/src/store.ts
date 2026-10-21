@@ -184,12 +184,23 @@ export function callsForDevice(deviceId: string, limit = 50): CallRow[] {
   return db.prepare("SELECT * FROM calls WHERE device_id = ? ORDER BY COALESCE(started_at, ring_at, created_at) DESC LIMIT ?").all(deviceId, limit).map(toCall);
 }
 
+/** Transcripts are kept for the debrief only; scores and tags stay. */
+export function purgeOldTranscripts(days = 30) {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  db.prepare("UPDATE calls SET transcript = NULL WHERE transcript IS NOT NULL AND ended_at < ?").run(cutoff);
+}
+
 export function callsByStatus(status: CallStatus): CallRow[] {
   return db.prepare("SELECT * FROM calls WHERE status = ?").all(status).map(toCall);
 }
 
 export function pendingCallFor(deviceId: string): CallRow | null {
   const r = db.prepare("SELECT * FROM calls WHERE device_id = ? AND status IN ('scheduled', 'ringing') ORDER BY ring_at LIMIT 1").get(deviceId);
+  return r ? toCall(r) : null;
+}
+
+export function ringingCallFor(deviceId: string): CallRow | null {
+  const r = db.prepare("SELECT * FROM calls WHERE device_id = ? AND status = 'ringing' ORDER BY ring_at DESC LIMIT 1").get(deviceId);
   return r ? toCall(r) : null;
 }
 

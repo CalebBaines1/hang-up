@@ -152,8 +152,8 @@ app.post("/api/calls", async (req, reply) => {
   const scenarioId = body.scenarioId && getScenario(body.scenarioId) ? body.scenarioId : randomScenarioId(device.id);
   const difficulty = body.difficulty && DIFFICULTIES.includes(body.difficulty) ? body.difficulty : nextDifficulty(device.id);
   // Practice-now replaces any call that is already ringing.
-  const pending = store.pendingCallFor(device.id);
-  if (pending?.status === "ringing") store.updateCall(pending.id, { status: "cancelled" });
+  const ringing = store.ringingCallFor(device.id);
+  if (ringing) store.updateCall(ringing.id, { status: "cancelled" });
   const call = store.createCall({ deviceId: device.id, scenarioId, difficulty, status: "ringing", source: "practice", ringAt: store.now() });
   return store.summarize(call);
 });
@@ -168,8 +168,8 @@ app.get("/api/calls", async (req, reply) => {
 app.get("/api/calls/ringing", async (req, reply) => {
   const device = auth(req, reply);
   if (!device) return;
-  const c = store.pendingCallFor(device.id);
-  return { call: c && c.status === "ringing" ? store.summarize(c) : null };
+  const c = store.ringingCallFor(device.id);
+  return { call: c ? store.summarize(c) : null };
 });
 
 function ownCall(req: FastifyRequest, reply: FastifyReply) {

@@ -2,7 +2,7 @@ import type { CallRow, DeviceRow } from "./store.ts";
 import type { Difficulty } from "@hangup/client";
 import { pushToDevice } from "./push.ts";
 import { getScenario, scenarios } from "./scenarios.ts";
-import { allDevices, callsByStatus, callsForDevice, createCall, pendingCallFor, updateCall } from "./store.ts";
+import { allDevices, callsByStatus, callsForDevice, createCall, pendingCallFor, purgeOldTranscripts, updateCall } from "./store.ts";
 import { localDayKey, randomTimeInWindow, safeTz } from "./time.ts";
 
 const RING_TIMEOUT_MS = 2 * 60 * 1000;
@@ -78,6 +78,7 @@ export async function tick() {
     if (c.ringAt && Date.parse(c.ringAt) < nowMs - RING_TIMEOUT_MS) updateCall(c.id, { status: "missed" });
   }
   for (const d of allDevices()) planScheduledCall(d);
+  purgeOldTranscripts();
 }
 
 export function startScheduler(everyMs = 20_000) {
