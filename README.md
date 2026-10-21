@@ -125,6 +125,7 @@ Tests: `pnpm test` (redaction, scoring rules, sentence splitting, safe word, tim
 ## Deploy
 
 - **Everything on one Nebius AI Cloud VM:** `docker compose up -d --build` runs Caddy (automatic HTTPS), the API (which also serves the built web app) and the speech service. Step-by-step guide: [docs/DEPLOY.md](docs/DEPLOY.md).
+- **Free: a Hugging Face Space** runs the web app, API and speech service in one container on the free CPU tier. See [deploy/huggingface](deploy/huggingface/README.md).
 - **Web app on Vercel (optional):** deploy `apps/web` (a `vercel.json` is included) with `VITE_API_URL` set to the API's URL, and add the Vercel domain to the API's `CORS_ORIGIN`.
 
 Environment variables are documented in [`.env.example`](.env.example). Keys are only ever read from the environment.
