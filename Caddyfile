@@ -1,0 +1,6 @@
+# HTTPS in front of the Hang Up API (which also serves the web app).
+# The microphone and web push only work over HTTPS.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy api:8787
+}

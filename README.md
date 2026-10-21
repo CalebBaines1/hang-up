@@ -124,7 +124,7 @@ Tests: `pnpm test` (redaction, scoring rules, sentence splitting, safe word, tim
 
 ## Deploy
 
-- **API + speech on one Nebius AI Cloud GPU VM:** `docker compose up -d --build` with `ONNX_PROVIDER=cuda`. The API container also serves the built web app, so one HTTPS hostname is enough. Put Caddy or another TLS proxy in front (the mic and web push need HTTPS).
+- **Everything on one Nebius AI Cloud VM:** `docker compose up -d --build` runs Caddy (automatic HTTPS), the API (which also serves the built web app) and the speech service. Step-by-step guide: [docs/DEPLOY.md](docs/DEPLOY.md).
 - **Web app on Vercel (optional):** deploy `apps/web` (a `vercel.json` is included) with `VITE_API_URL` set to the API's URL, and add the Vercel domain to the API's `CORS_ORIGIN`.
 
 Environment variables are documented in [`.env.example`](.env.example). Keys are only ever read from the environment.

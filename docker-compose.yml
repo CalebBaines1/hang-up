@@ -1,14 +1,28 @@
-# One box (for example a Nebius AI Cloud GPU VM) runs the whole app:
-#   docker compose up -d --build
-# then open http://<host>:8787. Put HTTPS in front of it for microphone access.
+# One VM (for example on Nebius AI Cloud) runs the whole app behind HTTPS:
+#   DOMAIN=1-2-3-4.sslip.io docker compose up -d --build
+# Caddy gets a Let's Encrypt certificate for DOMAIN automatically.
+# See docs/DEPLOY.md for the full walkthrough.
 services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - api
+    restart: unless-stopped
+
   api:
     build: .
-    ports:
-      - "8787:8787"
     env_file: .env
     environment:
       SPEECH_URL: http://speech:8001
+      CORS_ORIGIN: https://${DOMAIN}
     volumes:
       - hangup-data:/data
     depends_on:
@@ -18,10 +32,10 @@ services:
   speech:
     build: services/speech
     environment:
-      # Set to "cuda" on a GPU VM with the NVIDIA container toolkit
       ONNX_PROVIDER: ${ONNX_PROVIDER:-cpu}
-      NUM_THREADS: ${SPEECH_THREADS:-4}
+      NUM_THREADS: ${SPEECH_THREADS:-6}
     restart: unless-stopped
 
 volumes:
   hangup-data:
+  caddy-data:
