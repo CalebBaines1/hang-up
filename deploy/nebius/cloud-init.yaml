@@ -2,7 +2,8 @@
 # Paste into "Custom cloud-init config" when creating the VM (Ubuntu 24.04),
 # without the first line. Replace PASTE_YOUR_KEY_HERE with your Token Factory key.
 # It installs Docker, downloads Hang Up, starts it behind HTTPS on
-# <public-ip-with-dashes>.sslip.io, and powers the VM off after 20 idle minutes.
+# <public-ip-with-dashes>.sslip.io, and stops the VM after 20 idle minutes (attach a
+# service account that can manage Compute in the VM form for this).
 package_update: true
 packages: [git, curl]
 runcmd:

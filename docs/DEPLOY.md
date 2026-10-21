@@ -112,7 +112,7 @@ The VM keeps running (and billing) until you stop it in the console. Stop it aft
 
 ## Sleep when idle, wake on visit
 
-`deploy/nebius/idle-shutdown.sh` runs every minute from cron (the cloud-init sets this up). After 20 minutes with no app requests and no live call, it powers the VM off, so compute stops billing; only the disk and static IP keep billing (about $0.01/hour). An open app polls the API, so the VM stays up while anyone has Hang Up open.
+`deploy/nebius/idle-shutdown.sh` runs every minute from cron (the cloud-init sets this up). After 20 minutes with no app requests and no live call, it stops the VM through the Nebius API (a Linux `shutdown` would be treated as a crash and keep billing), so compute stops billing. This needs a service account attached to the VM (the VM form's **Service account** field) that is allowed to manage Compute; only the disk and static IP keep billing (about $0.01/hour). An open app polls the API, so the VM stays up while anyone has Hang Up open.
 
 To start it again on demand, host the web app on Vercel in front of the VM:
 
