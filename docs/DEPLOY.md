@@ -1,5 +1,7 @@
 # Deploying Hang Up on Nebius AI Cloud
 
+> Quickest path: paste [`deploy/nebius/cloud-init.yaml`](../deploy/nebius/cloud-init.yaml) into the VM form's custom cloud-init box and skip steps 3 to 6. The VM then powers itself off after 20 idle minutes; see "Sleep when idle" below.
+
 This puts the whole app (web app, API and speech service) on one Nebius AI Cloud VM behind HTTPS, so you get a public demo URL like `https://1-2-3-4.sslip.io`. It takes about 30 minutes, most of which is the first build.
 
 What you need: a Nebius AI Cloud account, your Token Factory API key, and an SSH key on your computer (`ls ~/.ssh/id_ed25519.pub`; if it's missing, run `ssh-keygen -t ed25519`).
@@ -107,6 +109,21 @@ The VM keeps running (and billing) until you stop it in the console. Stop it aft
 - **The page doesn't load / certificate error:** check that ports 80 and 443 are open and that `DOMAIN` matches the IP. `docker compose logs caddy` shows certificate errors.
 - **`"speech":false`:** the speech service is still starting or ran out of memory. `docker compose logs speech`. The app still works using the browser's voice in the meantime.
 - **The caller doesn't hear you:** the browser needs microphone permission, and the page must be on `https://`.
+
+## Sleep when idle, wake on visit
+
+`deploy/nebius/idle-shutdown.sh` runs every minute from cron (the cloud-init sets this up). After 20 minutes with no app requests and no live call, it powers the VM off, so compute stops billing; only the disk and static IP keep billing (about $0.01/hour). An open app polls the API, so the VM stays up while anyone has Hang Up open.
+
+To start it again on demand, host the web app on Vercel in front of the VM:
+
+1. **Nebius service account:** Administration → IAM → Service accounts → create `hang-up-waker`, add it to a group that can manage Compute (e.g. editors), then create an **authorized key** and download its credentials (service account ID, key ID, private key).
+2. **Vercel project:** import the GitHub repo, set the root directory to `apps/web`, and add these environment variables:
+   - `VITE_API_URL` = `https://<ip-with-dashes>.sslip.io`
+   - `NEBIUS_INSTANCE_ID` = the VM's ID (on its page in the console)
+   - `NEBIUS_SA_ID`, `NEBIUS_KEY_ID`, `NEBIUS_PRIVATE_KEY` = from the authorized key
+3. Deploy. When someone opens the Vercel URL and the VM is off, the app shows "Waking up the call line", calls `apps/web/api/wake.ts` to start the VM, and continues once the API answers (about a minute).
+
+Scheduled surprise calls and family calls only ring while the VM is up.
 
 ## Optional: GPU
 

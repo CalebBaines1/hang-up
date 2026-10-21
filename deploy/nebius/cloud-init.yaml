@@ -1,0 +1,15 @@
+#cloud-config
+# Paste into "Custom cloud-init config" when creating the VM (Ubuntu 24.04),
+# without the first line. Replace PASTE_YOUR_KEY_HERE with your Token Factory key.
+# It installs Docker, downloads Hang Up, starts it behind HTTPS on
+# <public-ip-with-dashes>.sslip.io, and powers the VM off after 20 idle minutes.
+package_update: true
+packages: [git, curl]
+runcmd:
+- curl -fsSL https://get.docker.com | sh
+- git clone https://github.com/CalebBaines1/hang-up.git /opt/hang-up
+- cd /opt/hang-up && (git checkout claude/project-thread-xdq9ec || true) && cp .env.example .env && chmod 600 .env
+- cd /opt/hang-up && sed -i "s/^DOMAIN=.*/DOMAIN=$(curl -fsS https://api.ipify.org | tr . -).sslip.io/" .env
+- cd /opt/hang-up && sed -i "s|^NEBIUS_API_KEY=.*|NEBIUS_API_KEY=PASTE_YOUR_KEY_HERE|" .env
+- echo "* * * * * root /opt/hang-up/deploy/nebius/idle-shutdown.sh" > /etc/cron.d/hangup-idle
+- cd /opt/hang-up && docker compose up -d --build > /var/log/hangup-build.log 2>&1

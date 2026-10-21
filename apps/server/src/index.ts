@@ -41,6 +41,14 @@ function auth(req: FastifyRequest, reply: FastifyReply) {
 
 const fail = (reply: FastifyReply, code: number, error: string) => reply.code(code).send({ error });
 
+// Idle tracking: the VM's idle-shutdown script powers the box off when nobody is using it.
+let lastActivity = Date.now();
+let activeCalls = 0;
+app.addHook("onRequest", async (req) => {
+  if (req.url.startsWith("/api/") && !req.url.startsWith("/api/health") && !req.url.startsWith("/api/activity")) lastActivity = Date.now();
+});
+app.get("/api/activity", async () => ({ idleSeconds: Math.round((Date.now() - lastActivity) / 1000), activeCalls }));
+
 app.get("/api/health", async () => ({ ok: true, speech: await speechAvailable(), personaModel: config.personaModel, judgeModel: config.judgeModel }));
 
 app.post("/api/devices", async (req) => {
@@ -218,6 +226,11 @@ app.register(async (scope) => {
       socket.close(4409, "call is not ringing");
       return;
     }
+    activeCalls++;
+    socket.on("close", () => {
+      activeCalls--;
+      lastActivity = Date.now();
+    });
     new CallSessionHandler(socket, call, device);
   });
 });
