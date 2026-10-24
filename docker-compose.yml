@@ -1,0 +1,46 @@
+# One VM (for example on Nebius AI Cloud) runs the whole app behind HTTPS:
+#   DOMAIN=1-2-3-4.sslip.io docker compose up -d --build
+# Caddy gets a Let's Encrypt certificate for DOMAIN automatically.
+# See docs/DEPLOY.md for the full walkthrough.
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build: .
+    env_file: .env
+    ports:
+      # localhost only: for the idle-shutdown script
+      - "127.0.0.1:8787:8787"
+    environment:
+      SPEECH_URL: http://speech:8001
+      # Auth is a bearer token (no cookies), so any origin may call the API,
+      # including the web app on Vercel.
+      CORS_ORIGIN: "*"
+    volumes:
+      - hangup-data:/data
+    depends_on:
+      - speech
+    restart: unless-stopped
+
+  speech:
+    build: services/speech
+    environment:
+      ONNX_PROVIDER: ${ONNX_PROVIDER:-cpu}
+      NUM_THREADS: ${SPEECH_THREADS:-6}
+    restart: unless-stopped
+
+volumes:
+  hangup-data:
+  caddy-data:

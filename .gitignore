@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+data/
+models/
+__pycache__/
+.venv/
+.DS_Store
+*.log
+dev-dist/
+.vercel
