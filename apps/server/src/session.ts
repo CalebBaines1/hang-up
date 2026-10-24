@@ -258,8 +258,9 @@ export class CallSessionHandler {
     const { lines, payload } = redactTranscript(this.transcript);
     updateCall(this.call.id, { status: "ended", endedAt: now(), endReason: reason, transcript: lines });
 
-    // The safe word and "This is practice" end the call without a score.
-    if (reason === "safe_word" || reason === "practice_reveal" || !this.startedAt) {
+    // The safe word and "This is practice" end the call without a score, and so
+    // does a dropped connection: it says nothing about what the user did.
+    if (reason === "safe_word" || reason === "practice_reveal" || reason === "disconnected" || !this.startedAt) {
       updateCall(this.call.id, { status: "scored", score: null, result: null });
       return;
     }

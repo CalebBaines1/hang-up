@@ -126,11 +126,13 @@ export function Debrief({
 
       {!r ? (
         <div className="card" style={{ marginTop: 16 }}>
-          <h3>Practice call ended</h3>
+          <h3>{call.endReason === "disconnected" ? "The call dropped" : "Practice call ended"}</h3>
           <p>
             {call.endReason === "safe_word"
               ? "You used your safe word, so there's no score. That's exactly what it's for."
-              : "You ended the practice call, so there's no score this time."}
+              : call.endReason === "disconnected"
+                ? "The connection dropped, so there's no score and it won't count against you. Try the call again."
+                : "You ended the practice call, so there's no score this time."}
           </p>
         </div>
       ) : (
@@ -166,6 +168,12 @@ export function Debrief({
             <div className="kicker">Earliest moment to hang up</div>
             <p style={{ marginTop: 6, color: "var(--text)" }}>{r.debrief.earliestMoment}</p>
           </div>
+          {r.debrief.beforePitch ? (
+            <div className="card">
+              <div className="kicker">What they were about to ask</div>
+              <p style={{ marginTop: 6, color: "var(--text)" }}>{r.debrief.beforePitch}</p>
+            </div>
+          ) : null}
           <div className="card">
             <div className="kicker" style={{ color: "var(--safe)" }}>
               You did well
@@ -220,9 +228,15 @@ export function Debrief({
       ) : null}
 
       <div className="stack">
-        <button className="btn btn-primary" onClick={() => onReplay(call.scenarioId, NEXT[call.difficulty])}>
-          {call.difficulty === "expert" ? "Replay at expert level" : `Try it at ${NEXT[call.difficulty]} level`}
-        </button>
+        {!r && call.endReason === "disconnected" ? (
+          <button className="btn btn-primary" onClick={() => onReplay(call.scenarioId, call.difficulty)}>
+            Try the call again
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={() => onReplay(call.scenarioId, NEXT[call.difficulty])}>
+            {call.difficulty === "expert" ? "Replay at expert level" : `Try it at ${NEXT[call.difficulty]} level`}
+          </button>
+        )}
         <button className="btn btn-ghost" onClick={onClose}>
           Done
         </button>

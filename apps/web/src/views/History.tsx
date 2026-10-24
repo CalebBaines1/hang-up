@@ -11,6 +11,13 @@ const LABEL: Partial<Record<CallSummary["status"], string>> = {
   ended: "Scoring…",
 };
 
+/** Declining a surprise call is a good habit, so it shows as screened, not as a miss. */
+function statusLabel(c: CallSummary) {
+  if (c.status === "scored") return c.endReason === "disconnected" ? "Dropped" : "No score";
+  if (c.status === "declined" && c.source !== "practice") return "Screened";
+  return LABEL[c.status] ?? "";
+}
+
 export function History({ onOpen }: { onOpen: (id: string) => void }) {
   const [calls, setCalls] = useState<CallSummary[] | null>(null);
 
@@ -47,7 +54,7 @@ export function History({ onOpen }: { onOpen: (id: string) => void }) {
                 {c.score}
               </div>
             ) : (
-              <span className="muted small">{c.status === "scored" ? "No score" : (LABEL[c.status] ?? "")}</span>
+              <span className="muted small">{statusLabel(c)}</span>
             )}
           </button>
         );

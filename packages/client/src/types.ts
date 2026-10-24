@@ -107,6 +107,8 @@ export interface Debrief {
   didWell: string;
   doDifferently: string;
   earliestMoment: string;
+  /** Set when the user hung up before the pitch: what the caller was about to ask and the tell to listen for. */
+  beforePitch?: string;
   /** Under 30 seconds when read aloud by the coach voice. */
   spoken: string;
 }

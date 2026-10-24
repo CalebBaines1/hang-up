@@ -13,12 +13,14 @@ interface JudgeTags {
   gave_partial_info: boolean;
   gave_payload: boolean;
   earliest_hangup_turn: number | null;
+  heard_pitch: boolean;
   debrief: {
     scam: string;
     biggest_tell: string;
     did_well: string;
     do_differently: string;
     earliest_moment: string;
+    before_pitch: string | null;
     spoken: string;
   };
 }
@@ -64,16 +66,18 @@ Return ONLY a JSON object with exactly these keys:
   "callback_official": <true if the user said they would hang up and call the official number / the number on their card / the real person directly>,
   "verifying_question": <true if the user asked a question to test the caller that the caller dodged or could not answer>,
   "refused_payload": <true if the user explicitly refused the payload at least once and never gave it>,
-  "gave_partial_info": <true if the user volunteered personal details such as full name, bank name, address, date of birth, a relative's name>,
-  "gave_payload": <true if the user handed over the payload or agreed to pay/install/buy>,
+  "gave_partial_info": <true ONLY if the user gave or confirmed one of: date of birth, home address, the name of their bank or an account detail, a relative's or friend's name, an email address, or identity details the caller read out to them. Saying their own first name, "yes", "hello" or "who is this" does NOT count>,
+  "gave_payload": <true ONLY if the user clearly handed over the payload (a code, card number, payment details) or clearly agreed to pay, buy, wire or install. Hesitating, asking questions or saying "maybe" is not giving it. The transcript comes from speech recognition and may contain misheard words, so do not infer a payload from garbled text>,
+  "heard_pitch": <true if the caller got as far as asking for the payload before the call ended>,
   "earliest_hangup_turn": <index of the earliest caller turn after which hanging up was clearly justified, or null>,
   "debrief": {
     "scam": "<one sentence naming the scam>",
     "biggest_tell": "<one sentence: the single biggest tell in THIS call>",
     "did_well": "<one sentence: something specific the user did well; if nothing, praise answering calmly>",
     "do_differently": "<one sentence: the one thing to do differently next time>",
-    "earliest_moment": "<one sentence quoting or paraphrasing the earliest moment they could have hung up>",
-    "spoken": "<the coach's spoken debrief, 45 to 75 words, second person, friendly, no lists. Always say this was a practice call, name the earliest moment they could have hung up, and end with one memorable rule.>"
+    "earliest_moment": "<one sentence quoting or paraphrasing the earliest moment they could have hung up; if they hung up before any red flag, say that ending it early was exactly right>",
+    "before_pitch": <if heard_pitch is false: two sentences, what this caller was about to ask for and the tell to listen for if a call like this ever gets further; otherwise null>,
+    "spoken": "<the coach's spoken debrief, 45 to 75 words, second person, friendly, no lists. Always say this was a practice call, name the earliest moment they could have hung up, and end with one memorable rule. If they hung up before the pitch, praise that, then briefly explain what the caller was going to ask for and the tell to listen for.>"
   }
 }`;
 }
@@ -155,8 +159,17 @@ export async function scoreCall(opts: {
     gave_partial_info: false,
     gave_payload: endReason === "payload_given",
     earliest_hangup_turn: null,
+    heard_pitch: true,
     debrief: null as unknown as JudgeTags["debrief"],
   };
+  // Numbers the redactor caught in the user's lines are a handover whatever the
+  // judge thinks. Short codes only count in scams that ask for a code; elsewhere
+  // a four-digit number is more likely a year or a street number.
+  const tokens = /\[(CARD|SSN|ACCOUNT)\]/;
+  const codeToken = /\bcodes?\b/i.test(scenario.ask) ? /\[CODE\]/ : null;
+  const redactedPayload = lines.some((l) => l.role === "user" && (tokens.test(l.text) || (codeToken?.test(l.text) ?? false)));
+  if (redactedPayload) safeTags.gave_payload = true;
+  const heardPitch = safeTags.heard_pitch ?? true;
   const redFlags: RedFlag[] = (safeTags.red_flags ?? [])
     .filter((f) => Number.isInteger(f.turn) && lines[f.turn]?.role === "caller")
     .map((f) => ({ turn: f.turn, label: String(f.label).slice(0, 80) }));
@@ -169,6 +182,7 @@ export async function scoreCall(opts: {
         didWell: d.did_well,
         doDifferently: d.do_differently,
         earliestMoment: d.earliest_moment,
+        ...(!heardPitch ? { beforePitch: d.before_pitch || `This caller was going to ask you to: ${scenario.ask} ${scenario.keyTell}` } : {}),
         spoken: d.spoken,
       }
     : fallbackDebrief(scenario);

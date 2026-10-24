@@ -32,19 +32,24 @@ export function inFailureCooldown(device: DeviceRow) {
   return failed && (!device.lastOpenAt || device.lastOpenAt < last.endedAt);
 }
 
-/** At most one practice call per local day. */
+/** At most one practice call per local day; a screened call counts. */
 export function hadCallToday(device: DeviceRow, at = new Date()) {
   const tz = safeTz(device.settings.timezone);
   const today = localDayKey(tz, at);
-  return callsForDevice(device.id, 5).some((c) => c.startedAt && c.source !== "practice" && localDayKey(tz, new Date(c.startedAt)) === today);
+  return callsForDevice(device.id, 5).some((c) => {
+    const at = c.startedAt ?? (c.status === "declined" ? c.ringAt : null);
+    return at && c.source !== "practice" && localDayKey(tz, new Date(at)) === today;
+  });
 }
 
 function planScheduledCall(device: DeviceRow) {
   const s = device.settings;
   if (!s.scheduleEnabled || !s.consentedAt || pendingCallFor(device.id) || inFailureCooldown(device)) return;
-  const last = callsForDevice(device.id, 10).find((c) => c.source === "schedule" && c.startedAt);
+  // A screened (declined) call uses up its slot like an answered one.
+  const last = callsForDevice(device.id, 10).find((c) => c.source === "schedule" && (c.startedAt || c.status === "declined"));
+  const lastAt = last ? (last.startedAt ?? last.ringAt) : null;
   const gapMs = (7 / Math.min(3, Math.max(1, s.callsPerWeek))) * 86400000 * 0.8;
-  let notBefore = new Date(Math.max(Date.now() + 5 * 60_000, last?.startedAt ? Date.parse(last.startedAt) + gapMs : 0));
+  let notBefore = new Date(Math.max(Date.now() + 5 * 60_000, lastAt ? Date.parse(lastAt) + gapMs : 0));
   if (hadCallToday(device, notBefore)) notBefore = new Date(notBefore.getTime() + 12 * 3600_000);
   const ringAt = randomTimeInWindow(s.window, safeTz(s.timezone), notBefore);
   if (!ringAt) return;

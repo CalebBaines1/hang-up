@@ -44,3 +44,8 @@ test("a dropped call doesn't earn the quiet bonus", () => {
   const { signals } = computeScore(none, [], "disconnected", 5_000);
   assert.equal(hit(signals, "stayed_quiet"), false);
 });
+
+test("an early hang-up before any flag still scores 100", () => {
+  const { score } = computeScore(none, [{ role: "caller", text: "Hi, is this the homeowner?", t: 0 }, { role: "user", text: "Who is this?", t: 3000 }], "hung_up", 6_000);
+  assert.equal(score, 100);
+});

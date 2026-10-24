@@ -23,14 +23,14 @@ const rules: { re: RegExp; token: string; payload: boolean }[] = [
   { re: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g, token: "[SSN]", payload: true },
   { re: /\b\d(?:[ -]?\d){12,18}\b/g, token: "[CARD]", payload: true },
   { re: /\b\d{7,12}\b/g, token: "[ACCOUNT]", payload: true },
-  // One-time codes are redacted but do not trigger the "call your bank" warning:
-  // in practice there was no real text message to read from.
-  { re: /\b\d{4,6}\b/g, token: "[CODE]", payload: false },
   {
     re: /\b\d{1,5}\s+\w+(?:\s\w+)?\s(?:street|st|avenue|ave|road|rd|lane|ln|drive|dr|court|ct|boulevard|blvd|way)\b/gi,
     token: "[ADDRESS]",
     payload: false,
   },
+  // One-time codes are redacted but do not trigger the "call your bank" warning:
+  // in practice there was no real text message to read from.
+  { re: /\b\d{4,6}\b/g, token: "[CODE]", payload: false },
 ];
 
 export function redactText(text: string): { text: string; payload: boolean } {

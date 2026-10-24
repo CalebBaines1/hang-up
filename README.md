@@ -43,7 +43,7 @@ Nemotron tags the behaviours; deterministic rules on top (time on the line, time
 | Gave partial personal info | −20 |
 | Gave the scammer what they asked for | −50 |
 
-Scores are clamped to 0–100. The safest habits score highest: hanging up quickly in silence scores 100.
+Scores are clamped to 0–100. The safest habits score highest: hanging up quickly in silence scores 100. Numbers the redactor catches in your lines (card, account, SSN, or a code in a scam that asks for one) count as handing the payload over, whatever the judge says. Dropped calls get no score, and declining a surprise call shows as "Screened" and uses up that day's call. If you hang up before the pitch, the debrief explains what the caller was about to ask and the tell to listen for.
 
 ### Scenarios
 
