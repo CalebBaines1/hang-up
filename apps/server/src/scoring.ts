@@ -23,15 +23,20 @@ interface JudgeTags {
   };
 }
 
+// The safest habits score highest: give nothing away, say little, hang up fast.
 export const SIGNALS: Record<ScoreSignal["id"], { label: string; points: number }> = {
+  kept_safe: { label: "Gave away nothing: no code, money or personal details", points: 50 },
   fast_hangup: { label: "Ended the call within 60 seconds of the first red flag", points: 40 },
-  callback_official: { label: "Said they'd call back on the official number", points: 30 },
-  verifying_question: { label: "Asked a verifying question the caller couldn't answer", points: 15 },
-  refused_payload: { label: "Refused to give the code, card or payment", points: 15 },
+  stayed_quiet: { label: "Didn't engage: said 10 words or fewer", points: 10 },
+  callback_official: { label: "Said they'd call back on the official number", points: 10 },
+  verifying_question: { label: "Asked a verifying question the caller couldn't answer", points: 5 },
+  refused_payload: { label: "Refused to give the code, card or payment", points: 5 },
   long_call: { label: "Stayed on the line past 3 minutes", points: -10 },
   partial_info: { label: "Gave partial personal info", points: -20 },
   gave_payload: { label: "Gave the scammer what they asked for", points: -50 },
 };
+
+const QUIET_WORDS = 10;
 
 function formatTranscript(lines: TranscriptLine[]) {
   return lines
@@ -47,6 +52,7 @@ What the scammer wanted: ${scenario.ask}
 The key tell for this scam: ${scenario.keyTell}
 How the call ended: ${endReason.replace(/_/g, " ")}
 User's first name: ${userName || "unknown"}
+The behaviour we want to build: give nothing away, say as little as possible, and hang up fast. Hanging up early, even before hearing the pitch, or staying silent is the ideal response; praise it and never suggest they should have engaged more.
 Note: values like [CODE], [CARD] or [SSN] in user lines mean the user said a real-looking number that was redacted for privacy; treat it as handing that thing over.
 
 Transcript (turn index, seconds since answer):
@@ -85,14 +91,19 @@ export function computeScore(
   const fastHangup =
     (endReason === "hung_up" || endReason === "caller_gave_up") && !tags.gave_payload && (firstFlagT === null ? durationMs <= 60_000 : durationMs - firstFlagT <= 60_000);
 
+  const gavePayload = tags.gave_payload || endReason === "payload_given";
+  const userWords = lines.filter((l) => l.role === "user").reduce((n, l) => n + (l.text.match(/[\p{L}\p{N}']+/gu)?.length ?? 0), 0);
+
   const hits: Record<ScoreSignal["id"], boolean> = {
+    kept_safe: !gavePayload && !tags.gave_partial_info,
     fast_hangup: fastHangup,
+    stayed_quiet: endReason !== "disconnected" && !gavePayload && userWords <= QUIET_WORDS,
     callback_official: tags.callback_official,
     verifying_question: tags.verifying_question,
-    refused_payload: tags.refused_payload && !tags.gave_payload,
+    refused_payload: tags.refused_payload && !gavePayload,
     long_call: durationMs > 180_000,
     partial_info: tags.gave_partial_info,
-    gave_payload: tags.gave_payload || endReason === "payload_given",
+    gave_payload: gavePayload,
   };
   const signals = (Object.keys(SIGNALS) as ScoreSignal["id"][]).map((id) => ({
     id,
@@ -140,7 +151,7 @@ export async function scoreCall(opts: {
     red_flags: [],
     callback_official: false,
     verifying_question: false,
-    refused_payload: endReason !== "payload_given",
+    refused_payload: false,
     gave_partial_info: false,
     gave_payload: endReason === "payload_given",
     earliest_hangup_turn: null,

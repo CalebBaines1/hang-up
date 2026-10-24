@@ -33,13 +33,17 @@ Nemotron tags the behaviours; deterministic rules on top (time on the line, time
 
 | Signal | Points |
 | --- | --- |
-| Ended the call within 60 s of the first red flag | +40 |
-| Said they'd call back on the official number | +30 |
-| Asked a verifying question the caller couldn't answer | +15 |
-| Refused the code, card or payment | +15 |
+| Gave away nothing: no code, money or personal details | +50 |
+| Ended the call within 60 s of the first red flag (or within 60 s if no flag) | +40 |
+| Didn't engage: said 10 words or fewer | +10 |
+| Said they'd call back on the official number | +10 |
+| Asked a verifying question the caller couldn't answer | +5 |
+| Refused to give the code, card or payment | +5 |
 | Stayed on the line past 3 minutes | −10 |
 | Gave partial personal info | −20 |
-| Gave the payload | −50 |
+| Gave the scammer what they asked for | −50 |
+
+Scores are clamped to 0–100. The safest habits score highest: hanging up quickly in silence scores 100.
 
 ### Scenarios
 

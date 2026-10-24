@@ -87,7 +87,9 @@ export interface RedFlag {
 
 export interface ScoreSignal {
   id:
+    | "kept_safe"
     | "fast_hangup"
+    | "stayed_quiet"
     | "callback_official"
     | "verifying_question"
     | "refused_payload"
