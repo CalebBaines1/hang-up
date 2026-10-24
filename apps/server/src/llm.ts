@@ -27,16 +27,25 @@ function body(opts: ChatOpts, stream: boolean) {
   });
 }
 
+const RETRY_DELAYS_MS = [600, 2000];
+
+/** Retries 429s and 5xx (Token Factory returns an occasional 503 under load). */
 async function post(opts: ChatOpts, stream: boolean) {
   if (!config.nebiusApiKey) throw new Error("NEBIUS_API_KEY is not set");
-  const res = await fetch(`${config.nebiusBaseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${config.nebiusApiKey}`, "content-type": "application/json" },
-    body: body(opts, stream),
-    signal: opts.signal,
-  });
-  if (!res.ok) throw new Error(`Token Factory ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  return res;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${config.nebiusBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${config.nebiusApiKey}`, "content-type": "application/json" },
+      body: body(opts, stream),
+      signal: opts.signal,
+    });
+    if (res.ok) return res;
+    const retryable = res.status === 429 || res.status >= 500;
+    const text = (await res.text()).slice(0, 300);
+    if (!retryable || attempt >= RETRY_DELAYS_MS.length || opts.signal?.aborted) throw new Error(`Token Factory ${res.status}: ${text}`);
+    console.warn(`Token Factory ${res.status}, retrying`);
+    await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+  }
 }
 
 /** Streams content tokens (reasoning tokens are skipped). */
@@ -64,10 +73,12 @@ export async function* chatStream(opts: ChatOpts): AsyncGenerator<string> {
   }
 }
 
+/** Streams under the hood: a long reasoning call held open with no bytes can be
+ * cut off by a gateway, while a stream keeps the connection busy. */
 export async function chat(opts: ChatOpts): Promise<string> {
-  const res = await post(opts, false);
-  const json = (await res.json()) as { choices: { message: { content: string | null } }[] };
-  return json.choices[0]?.message?.content ?? "";
+  let out = "";
+  for await (const delta of chatStream(opts)) out += delta;
+  return out;
 }
 
 /** Pulls the first JSON object out of a model reply. */

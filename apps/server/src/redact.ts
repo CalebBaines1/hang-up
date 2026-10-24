@@ -33,8 +33,13 @@ const rules: { re: RegExp; token: string; payload: boolean }[] = [
   { re: /\b\d{4,6}\b/g, token: "[CODE]", payload: false },
 ];
 
+/** "4 8 2 9 1 7" -> "482917": speech recognition often spaces out read digits. */
+function joinSpacedDigits(text: string) {
+  return text.replace(/\b\d(?:[\s,.-]+\d\b){3,}/g, (m) => m.replace(/\D/g, ""));
+}
+
 export function redactText(text: string): { text: string; payload: boolean } {
-  let out = normaliseSpokenDigits(text);
+  let out = joinSpacedDigits(normaliseSpokenDigits(text));
   let payload = false;
   for (const r of rules) {
     out = out.replace(r.re, () => {
