@@ -1,0 +1,14 @@
+# Render Blueprint: the API + web app in one free web service.
+# Free services sleep after 15 idle minutes and wake on the next visit.
+# No speech service here, so calls use the browser's own voice and listening.
+services:
+  - type: web
+    name: hang-up
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NEBIUS_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"
