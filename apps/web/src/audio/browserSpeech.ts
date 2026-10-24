@@ -23,6 +23,7 @@ export function browserSpeechSupported() {
 export class BrowserListener {
   private rec: Recognition | null = null;
   private active = false;
+  private stopped = false;
   muted = false;
 
   constructor(
@@ -50,7 +51,7 @@ export class BrowserListener {
       }
     };
     rec.onend = () => {
-      if (this.active) setTimeout(() => this.active && rec.start(), 150);
+      if (this.active && this.rec === rec) setTimeout(() => this.active && this.rec === rec && rec.start(), 150);
     };
     rec.onerror = () => {};
     rec.start();
@@ -58,9 +59,24 @@ export class BrowserListener {
   }
 
   stop() {
+    this.stopped = true;
     this.active = false;
     this.rec?.abort();
     this.rec = null;
+  }
+
+  /** Stop listening while the caller talks. On phones a live recognizer can
+   * cut synthesis off, and on speakers it hears the caller's voice. */
+  pause() {
+    if (!this.active) return;
+    this.active = false;
+    this.rec?.abort();
+    this.rec = null;
+  }
+
+  resume() {
+    if (this.stopped || this.active || this.rec) return;
+    this.start();
   }
 }
 

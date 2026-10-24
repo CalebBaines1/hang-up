@@ -57,6 +57,8 @@ export function InCall({
     let timer: ReturnType<typeof setInterval> | null = null;
     let stopAmbience: (() => void) | null = null;
     let callerSaying = "";
+    let lastCallerLine = "";
+    let callerQuietAt = 0;
     const player = new VoicePlayer();
     const speaker = new BrowserSpeaker();
 
@@ -82,6 +84,8 @@ export function InCall({
     finishRef.current = finish;
 
     const callerIdle = () => {
+      callerQuietAt = Date.now();
+      listenerRef.current?.resume();
       if (micRef.current) micRef.current.callerTalking = false;
       setStatus("");
     };
@@ -125,16 +129,18 @@ export function InCall({
             micRef.current = mic;
             await mic.start();
           } else {
+            // Browser recognition hears the caller's voice through the speaker and
+            // garbles it, so word matching can't tell echo from the user. Listen
+            // only while the caller is quiet (no barge-in in this mode); the
+            // listener is paused while the caller speaks.
+            const echo = (text: string) => speaker.speaking || (Date.now() - callerQuietAt < 1500 && overlap(text, lastCallerLine) > 0.5);
             const listener = new BrowserListener(
               (text) => {
-                // Ignore recognition of the caller's own voice coming out of the speaker.
-                if (speaker.speaking && overlap(text, callerSaying) > 0.6) return;
-                bargeIn();
+                if (echo(text)) return;
                 session.sayText(text);
               },
               (interim) => {
-                setLevel(0.6);
-                if (speaker.speaking && interim.split(/\s+/).length >= 3 && overlap(interim, callerSaying) < 0.5) bargeIn();
+                if (!echo(interim)) setLevel(0.6);
               },
             );
             listenerRef.current = listener;
@@ -151,6 +157,7 @@ export function InCall({
       });
       session.on("caller_say", (m) => {
         callerSaying += " " + m.text;
+        listenerRef.current?.pause();
         speaker.say(m.text, m.voiceHint);
       });
       session.on("caller_text", (m) => {
@@ -162,6 +169,7 @@ export function InCall({
         });
       });
       session.on("caller_turn_end", () => {
+        lastCallerLine = callerSaying;
         callerSaying = "";
       });
       session.on("user_text", (m) => {
