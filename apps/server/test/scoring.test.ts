@@ -23,12 +23,12 @@ test("fast hang-up with callback and refusal scores 100", () => {
 
 test("staying on to argue scores lower than hanging up", () => {
   const talky = [...lines, { role: "user" as const, text: "I really do not believe you and I want to know who you are and why you called", t: 60_000 }];
-  const { score } = computeScore(base, talky, "caller_gave_up", 150_000);
+  const { score } = computeScore(base, talky, "caller_gave_up", 85_000);
   assert.equal(score, 65);
 });
 
 test("giving the payload scores 0", () => {
-  const { score, signals } = computeScore({ ...base, callback_official: false, refused_payload: false, gave_payload: true }, lines, "payload_given", 200_000);
+  const { score, signals } = computeScore({ ...base, callback_official: false, refused_payload: false, gave_payload: true }, lines, "payload_given", 110_000);
   assert.equal(score, 0);
   assert.ok(hit(signals, "gave_payload"));
   assert.ok(hit(signals, "long_call"));

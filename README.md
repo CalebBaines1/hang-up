@@ -24,7 +24,7 @@ Every call makes Token Factory requests at runtime: one streamed Nemotron comple
 1. **Opt in.** Pick a window (say weekday evenings), 1 to 3 calls a week, and a safe word.
 2. **The ring.** A full-screen incoming call with a generic caller ID ("Your Bank", "Unknown"), a ringtone and vibration. It arrives at a random moment inside your window, or right away with "Ring me now".
 3. **The call.** You talk; Parakeet transcribes each utterance; Nemotron answers in character; Kokoro speaks it through a phone-line filter over call-centre or street ambience. You can talk over the caller (barge-in).
-4. **The ending.** You hang up, say your safe word, hand over the "payload" (a code, a card number, agreeing to pay), or the caller gives up after enough firm refusals. Calls are capped at 4 minutes.
+4. **The ending.** You hang up, say your safe word, hand over the "payload" (a code, a card number, agreeing to pay), or the caller gives up after enough firm refusals. Calls are capped at 2 minutes.
 5. **The debrief.** A score out of 100 built from behaviours that actually protect people, a spoken 30-second coach debrief, the biggest tell, what you did well, the one thing to do differently, and the transcript with each red flag marked and a "you could have hung up here" line.
 
 ### Scoring
@@ -39,7 +39,7 @@ Nemotron tags the behaviours; deterministic rules on top (time on the line, time
 | Said they'd call back on the official number | +10 |
 | Asked a verifying question the caller couldn't answer | +5 |
 | Refused to give the code, card or payment | +5 |
-| Stayed on the line past 3 minutes | −10 |
+| Stayed on the line past 90 seconds | −10 |
 | Gave partial personal info | −20 |
 | Gave the scammer what they asked for | −50 |
 

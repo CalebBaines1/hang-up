@@ -33,7 +33,7 @@ export const SIGNALS: Record<ScoreSignal["id"], { label: string; points: number 
   callback_official: { label: "Said they'd call back on the official number", points: 10 },
   verifying_question: { label: "Asked a verifying question the caller couldn't answer", points: 5 },
   refused_payload: { label: "Refused to give the code, card or payment", points: 5 },
-  long_call: { label: "Stayed on the line past 3 minutes", points: -10 },
+  long_call: { label: "Stayed on the line past 90 seconds", points: -10 },
   partial_info: { label: "Gave partial personal info", points: -20 },
   gave_payload: { label: "Gave the scammer what they asked for", points: -50 },
 };
@@ -105,7 +105,7 @@ export function computeScore(
     callback_official: tags.callback_official,
     verifying_question: tags.verifying_question,
     refused_payload: tags.refused_payload && !gavePayload,
-    long_call: durationMs > 180_000,
+    long_call: durationMs > 90_000,
     partial_info: tags.gave_partial_info,
     gave_payload: gavePayload,
   };

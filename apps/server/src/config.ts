@@ -26,6 +26,6 @@ export const config = {
     teamId: env.APNS_TEAM_ID ?? "",
     bundleId: env.APNS_BUNDLE_ID ?? "",
   },
-  maxCallMs: Number(env.MAX_CALL_MS ?? 4 * 60 * 1000),
+  maxCallMs: Number(env.MAX_CALL_MS ?? 2 * 60 * 1000),
   webDir: env.WEB_DIR ? resolve(env.WEB_DIR) : "",
 };
