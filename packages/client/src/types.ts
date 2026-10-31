@@ -48,6 +48,11 @@ export interface Settings {
   /** Parent opt-in: linked family members may queue practice calls. */
   familyCallsEnabled: boolean;
   consentedAt: string | null;
+  /** E.164 number, set only after it passed SMS verification. */
+  phoneNumber: string | null;
+  phoneVerifiedAt: string | null;
+  /** Ring the verified phone number with a real call instead of the app. */
+  ringPhone: boolean;
 }
 
 export type CallStatus =
@@ -61,6 +66,9 @@ export type CallStatus =
   | "cancelled";
 
 export type CallSource = "practice" | "schedule" | "family";
+
+/** How a call reaches the user: the app (CallKit or browser) or a real phone call. */
+export type CallVia = "app" | "phone";
 
 export type EndReason =
   | "hung_up"
@@ -139,6 +147,7 @@ export interface CallSummary {
   endReason: EndReason | null;
   score: number | null;
   durationMs: number | null;
+  via: CallVia;
 }
 
 export interface CallDetail extends CallSummary {
@@ -170,6 +179,8 @@ export interface Me {
   stats: { calls: number; averageScore: number | null; streakDays: number };
   nextCall: { ringAt: string; source: CallSource } | null;
   speech: { server: boolean };
+  /** The server can place real phone calls (Twilio and phone speech are configured). */
+  phoneCalls: boolean;
 }
 
 // ---- WebSocket call session protocol ----

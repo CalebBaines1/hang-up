@@ -65,6 +65,10 @@ struct Settings: Codable, Equatable {
     var callsPerWeek: Int
     var familyCallsEnabled: Bool
     var consentedAt: String?
+    // Real phone calls (optional so older servers still decode).
+    var phoneNumber: String?
+    var phoneVerifiedAt: String?
+    var ringPhone: Bool?
 }
 
 struct Me: Codable {
@@ -76,6 +80,11 @@ struct Me: Codable {
     var stats: Stats
     var nextCall: NextCall?
     var speech: Speech
+    /// The server can place real phone calls.
+    var phoneCalls: Bool?
+
+    /// Practice and surprise calls go to the user's verified phone number.
+    var ringsPhone: Bool { phoneCalls == true && settings.ringPhone == true && settings.phoneVerifiedAt != nil }
 }
 
 struct CallSummary: Codable, Identifiable, Hashable {
@@ -93,6 +102,7 @@ struct CallSummary: Codable, Identifiable, Hashable {
     var endReason: EndReason?
     var score: Int?
     var durationMs: Int?
+    var via: String?
 }
 
 struct TranscriptLine: Codable, Hashable {

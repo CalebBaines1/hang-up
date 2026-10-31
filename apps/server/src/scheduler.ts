@@ -1,8 +1,9 @@
 import type { CallRow, DeviceRow } from "./store.ts";
 import type { Difficulty } from "@hangup/client";
+import { ringByPhone, wantsPhone } from "./phone.ts";
 import { pushToDevice } from "./push.ts";
 import { getScenario, scenarios } from "./scenarios.ts";
-import { allDevices, callsByStatus, callsForDevice, createCall, pendingCallFor, purgeOldTranscripts, updateCall } from "./store.ts";
+import { allDevices, callsByStatus, callsForDevice, createCall, getDevice, pendingCallFor, purgeOldTranscripts, updateCall } from "./store.ts";
 import { localDayKey, randomTimeInWindow, safeTz } from "./time.ts";
 
 const RING_TIMEOUT_MS = 2 * 60 * 1000;
@@ -65,6 +66,9 @@ function planScheduledCall(device: DeviceRow) {
 
 export async function ring(call: CallRow) {
   updateCall(call.id, { status: "ringing" });
+  const device = getDevice(call.deviceId);
+  // Users who verified a number and turned on real calls get a phone call instead of a push.
+  if (device && wantsPhone(device) && (await ringByPhone(call, device))) return;
   const scenario = getScenario(call.scenarioId);
   await pushToDevice(call.deviceId, {
     title: scenario?.callerId ?? "Incoming call",

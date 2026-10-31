@@ -1,6 +1,7 @@
 import type {
   CallDetail,
   CallSummary,
+  CallVia,
   Difficulty,
   FamilyMember,
   FamilyParent,
@@ -77,8 +78,20 @@ export class HangUpApi {
     return this.req<{ scenarios: Scenario[]; personas: Persona[] }>("GET", "/api/scenarios");
   }
 
-  /** "Practice now": creates a call that rings immediately. */
-  practice(opts: { scenarioId?: string; difficulty?: Difficulty } = {}) {
+  /** Text a 6-digit code to this number (E.164, e.g. +15551234567). */
+  startPhoneVerification(phone: string) {
+    return this.req<void>("POST", "/api/me/phone", { phone });
+  }
+  /** Confirm the texted code. On success the number is saved and real phone calls are turned on. */
+  confirmPhone(code: string) {
+    return this.req<Me>("POST", "/api/me/phone/verify", { code });
+  }
+  removePhone() {
+    return this.req<Me>("DELETE", "/api/me/phone");
+  }
+
+  /** "Practice now": creates a call that rings immediately (via "phone" dials the verified number). */
+  practice(opts: { scenarioId?: string; difficulty?: Difficulty; via?: CallVia } = {}) {
     return this.req<CallSummary>("POST", "/api/calls", opts);
   }
   /** A scheduled or family call whose ring time has arrived, if any. */

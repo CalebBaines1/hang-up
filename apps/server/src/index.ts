@@ -4,9 +4,10 @@ import websocket from "@fastify/websocket";
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
-import type { Difficulty, FamilyParent, Me, Settings } from "@hangup/client";
+import type { CallVia, Difficulty, FamilyParent, Me, Settings } from "@hangup/client";
 import { config } from "./config.ts";
 import { apnsEnabled } from "./apns.ts";
+import { onDialStatus, PhoneBridge, ringByPhone, wantsPhone } from "./phone.ts";
 import { vapidPublicKey } from "./push.ts";
 import { getScenario, personas, scenarios } from "./scenarios.ts";
 import { hadCallToday, inFailureCooldown, nextDifficulty, randomScenarioId, startScheduler } from "./scheduler.ts";
@@ -14,6 +15,7 @@ import { CallSessionHandler } from "./session.ts";
 import { speechAvailable, synthesize } from "./speech.ts";
 import * as store from "./store.ts";
 import { describeWindow, randomTimeInWindow, safeTz } from "./time.ts";
+import * as twilio from "./twilio.ts";
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" }, bodyLimit: 256 * 1024 });
 
@@ -22,6 +24,10 @@ await app.register(cors, {
   methods: ["GET", "POST", "PATCH", "DELETE"],
 });
 await app.register(websocket, { options: { maxPayload: 1024 * 1024 } });
+// Twilio posts webhooks as forms.
+app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (_req, body, done) => {
+  done(null, Object.fromEntries(new URLSearchParams(body as string)));
+});
 
 // ---- auth: each install registers a device and gets a bearer token ----
 
@@ -81,6 +87,7 @@ async function meFor(device: store.DeviceRow): Promise<Me> {
     },
     nextCall: pending && pending.ringAt ? { ringAt: pending.ringAt, source: pending.source } : null,
     speech: { server: await speechAvailable() },
+    phoneCalls: twilio.phoneCallsEnabled(),
   };
 }
 
@@ -123,6 +130,10 @@ app.patch("/api/me/settings", async (req, reply) => {
     s.familyCallsEnabled = patch.familyCallsEnabled;
     if (patch.familyCallsEnabled && !device.familyCode) store.setFamilyCode(device.id, familyCode());
   }
+  if (typeof patch.ringPhone === "boolean") {
+    if (patch.ringPhone && !s.phoneVerifiedAt) return fail(reply, 400, "Verify your phone number first.");
+    s.ringPhone = patch.ringPhone;
+  }
   if (patch.consentedAt !== undefined && patch.consentedAt !== null && !s.consentedAt) s.consentedAt = store.now();
   store.saveSettings(device.id, s);
   // Schedule changes invalidate a planned (not yet ringing) scheduled call.
@@ -130,6 +141,58 @@ app.patch("/api/me/settings", async (req, reply) => {
     const pending = store.pendingCallFor(device.id);
     if (pending && pending.status === "scheduled" && pending.source === "schedule") store.updateCall(pending.id, { status: "cancelled" });
   }
+  return meFor(store.getDevice(device.id)!);
+});
+
+// ---- phone number: verified by SMS code before the server will ever dial it ----
+
+const pendingPhones = new Map<string, { phone: string; attempts: number[] }>();
+
+app.post("/api/me/phone", async (req, reply) => {
+  const device = auth(req, reply);
+  if (!device) return;
+  if (!twilio.verifyEnabled()) return fail(reply, 503, "Phone calls aren't set up on this server.");
+  const phone = twilio.normalizePhone(String((req.body as { phone?: string } | null)?.phone ?? ""));
+  if (!phone) return fail(reply, 400, "Enter the number with its country code, like +1 555 123 4567.");
+  // At most 5 codes an hour per device, so nobody can use this to spam texts.
+  const prev = pendingPhones.get(device.id);
+  const attempts = (prev?.attempts ?? []).filter((t) => Date.now() - t < 3600_000);
+  if (attempts.length >= 5) return fail(reply, 429, "Too many codes. Try again in an hour.");
+  try {
+    await twilio.startVerification(phone);
+  } catch (err) {
+    req.log.warn({ err }, "verify start failed");
+    return fail(reply, 400, "We couldn't text that number. Check it and try again.");
+  }
+  pendingPhones.set(device.id, { phone, attempts: [...attempts, Date.now()] });
+  return reply.code(204).send();
+});
+
+app.post("/api/me/phone/verify", async (req, reply) => {
+  const device = auth(req, reply);
+  if (!device) return;
+  const pending = pendingPhones.get(device.id);
+  const code = String((req.body as { code?: string } | null)?.code ?? "").replace(/\D/g, "");
+  if (!pending) return fail(reply, 400, "Ask for a new code first.");
+  if (!/^\d{4,10}$/.test(code)) return fail(reply, 400, "Enter the code from the text message.");
+  let ok = false;
+  try {
+    ok = await twilio.checkVerification(pending.phone, code);
+  } catch (err) {
+    req.log.warn({ err }, "verify check failed");
+    return fail(reply, 502, "Couldn't check the code. Try again.");
+  }
+  if (!ok) return fail(reply, 400, "That code didn't match. Check the text and try again.");
+  pendingPhones.delete(device.id);
+  store.saveSettings(device.id, { ...device.settings, phoneNumber: pending.phone, phoneVerifiedAt: store.now(), ringPhone: true });
+  return meFor(store.getDevice(device.id)!);
+});
+
+app.delete("/api/me/phone", async (req, reply) => {
+  const device = auth(req, reply);
+  if (!device) return;
+  pendingPhones.delete(device.id);
+  store.saveSettings(device.id, { ...device.settings, phoneNumber: null, phoneVerifiedAt: null, ringPhone: false });
   return meFor(store.getDevice(device.id)!);
 });
 
@@ -157,14 +220,20 @@ app.post("/api/calls", async (req, reply) => {
   const device = auth(req, reply);
   if (!device) return;
   if (!device.settings.consentedAt) return fail(reply, 403, "Finish setup and consent before practice calls.");
-  const body = (req.body ?? {}) as { scenarioId?: string; difficulty?: Difficulty };
+  const body = (req.body ?? {}) as { scenarioId?: string; difficulty?: Difficulty; via?: CallVia };
+  if (body.via === "phone" && !wantsPhone({ ...device, settings: { ...device.settings, ringPhone: true } }))
+    return fail(reply, 400, "Verify your phone number in Settings to get real calls.");
   const scenarioId = body.scenarioId && getScenario(body.scenarioId) ? body.scenarioId : randomScenarioId(device.id);
   const difficulty = body.difficulty && DIFFICULTIES.includes(body.difficulty) ? body.difficulty : nextDifficulty(device.id);
   // Practice-now replaces any call that is already ringing.
   const ringing = store.ringingCallFor(device.id);
   if (ringing) store.updateCall(ringing.id, { status: "cancelled" });
   const call = store.createCall({ deviceId: device.id, scenarioId, difficulty, status: "ringing", source: "practice", ringAt: store.now() });
-  return store.summarize(call);
+  if (body.via === "phone" && !(await ringByPhone(call, device))) {
+    store.updateCall(call.id, { status: "cancelled" });
+    return fail(reply, 502, "Couldn't place the phone call. Try again in a moment.");
+  }
+  return store.summarize(store.getCall(call.id)!);
 });
 
 app.get("/api/calls", async (req, reply) => {
@@ -178,7 +247,8 @@ app.get("/api/calls/ringing", async (req, reply) => {
   const device = auth(req, reply);
   if (!device) return;
   const c = store.ringingCallFor(device.id);
-  return { call: c ? store.summarize(c) : null };
+  // A call that's ringing the user's real phone must not also ring in the app.
+  return { call: c && c.via === "app" ? store.summarize(c) : null };
 });
 
 function ownCall(req: FastifyRequest, reply: FastifyReply) {
@@ -223,7 +293,7 @@ app.register(async (scope) => {
       socket.close(4401, "unauthorized");
       return;
     }
-    if (call.status !== "ringing") {
+    if (call.status !== "ringing" || call.via !== "app") {
       socket.close(4409, "call is not ringing");
       return;
     }
@@ -233,6 +303,50 @@ app.register(async (scope) => {
       lastActivity = Date.now();
     });
     new CallSessionHandler(socket, call, device);
+  });
+});
+
+// ---- real phone calls (Twilio) ----
+
+function twilioRequest(req: FastifyRequest, reply: FastifyReply) {
+  const params = (req.body ?? {}) as Record<string, string>;
+  if (!twilio.validSignature(config.publicUrl + req.url, params, req.headers["x-twilio-signature"] as string | undefined)) {
+    fail(reply, 403, "Bad signature");
+    return null;
+  }
+  return { params, callId: String((req.query as { callId?: string }).callId ?? "") };
+}
+
+// Twilio fetches this when the user answers. Voicemail gets a hang-up, a person gets the stream.
+app.post("/api/twilio/voice", async (req, reply) => {
+  const r = twilioRequest(req, reply);
+  if (!r) return;
+  reply.type("text/xml");
+  const call = store.getCall(r.callId);
+  if (!call || call.via !== "phone" || call.status !== "ringing") return twilio.hangupTwiml;
+  if (/^(machine|fax)/.test(r.params.AnsweredBy ?? "")) {
+    store.updateCall(call.id, { status: "missed" });
+    return twilio.hangupTwiml;
+  }
+  return twilio.streamTwiml(call.id);
+});
+
+app.post("/api/twilio/status", async (req, reply) => {
+  const r = twilioRequest(req, reply);
+  if (!r) return;
+  onDialStatus(r.callId, r.params.CallStatus ?? "");
+  return reply.code(204).send();
+});
+
+app.register(async (scope) => {
+  scope.get("/api/twilio/stream", { websocket: true }, (socket) => {
+    new PhoneBridge(socket, {
+      onStart: () => activeCalls++,
+      onEnd: () => {
+        activeCalls--;
+        lastActivity = Date.now();
+      },
+    });
   });
 });
 

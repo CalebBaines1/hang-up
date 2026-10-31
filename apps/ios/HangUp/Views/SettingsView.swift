@@ -58,6 +58,8 @@ struct SettingsView: View {
                 ProgressView()
             }
 
+            PhoneSection()
+
             Section {
                 TextField("Server URL", text: $server)
                     .keyboardType(.URL)
@@ -79,7 +81,13 @@ struct SettingsView: View {
             s = model.me?.settings
             server = model.serverURL
         }
-        .onChange(of: model.me?.settings) { _, new in if s == nil { s = new } }
+        .onChange(of: model.me?.settings) { _, new in
+            if s == nil { s = new; return }
+            // The phone section saves on its own; keep its fields in step so Save stays disabled.
+            s?.phoneNumber = new?.phoneNumber
+            s?.phoneVerifiedAt = new?.phoneVerifiedAt
+            s?.ringPhone = new?.ringPhone
+        }
         .confirmationDialog("Delete all your calls, scores and settings?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 Task {

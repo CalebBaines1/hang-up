@@ -18,6 +18,8 @@ final class AppModel: ObservableObject {
     @Published var banner: String?
     @Published var countdown: Int?
     private var practicing = false
+    /// A real phone call we placed; its debrief opens when the user comes back to the app.
+    private var phoneCallId: String?
 
     static let defaultServer = (Bundle.main.object(forInfoDictionaryKey: "HangUpServerURL") as? String) ?? "https://hang-up.onrender.com"
 
@@ -78,6 +80,7 @@ final class AppModel: ObservableObject {
         guard registered else { return }
         try? await api.opened()
         await refresh()
+        await showPhoneDebriefIfReady()
         // A scheduled call that rang while no VoIP push could reach us: ring it now.
         if activeCall == nil, !practicing, let call = try? await api.ringing(), !CallManager.shared.isTracking(callId: call.id) {
             CallManager.shared.reportIncoming(callId: call.id, callerId: call.callerId)
@@ -108,6 +111,7 @@ final class AppModel: ObservableObject {
     func practice(scenarioId: String?, difficulty: Difficulty?, delay: Int) async {
         practicing = true
         defer { practicing = false }
+        if me?.ringsPhone == true { return await practiceByPhone(scenarioId: scenarioId, difficulty: difficulty, delay: delay) }
         do {
             let call = try await api.practice(scenarioId: scenarioId, difficulty: difficulty)
             guard delay > 0 else {
@@ -127,6 +131,38 @@ final class AppModel: ObservableObject {
         } catch {
             countdown = nil
             banner = error.localizedDescription
+        }
+    }
+
+    /// Real phone call: count down here, then the server dials the verified number.
+    private func practiceByPhone(scenarioId: String?, difficulty: Difficulty?, delay: Int) async {
+        let bg = UIApplication.shared.beginBackgroundTask(withName: "dial")
+        defer { UIApplication.shared.endBackgroundTask(bg) }
+        do {
+            for left in stride(from: delay, to: 0, by: -1) {
+                countdown = left
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+            countdown = nil
+            let call = try await api.practice(scenarioId: scenarioId, difficulty: difficulty, viaPhone: true)
+            phoneCallId = call.id
+            banner = "Calling your phone now."
+        } catch {
+            countdown = nil
+            banner = error.localizedDescription
+        }
+    }
+
+    private func showPhoneDebriefIfReady() async {
+        guard let id = phoneCallId, debrief == nil, let call = try? await api.call(id).summary else { return }
+        switch call.status {
+        case "scored":
+            phoneCallId = nil
+            if call.endReason != .practiceReveal && call.startedAt != nil { debrief = DebriefTarget(id: id) }
+        case "missed", "declined", "cancelled":
+            phoneCallId = nil
+        default:
+            break // still ringing, on the line, or being scored
         }
     }
 

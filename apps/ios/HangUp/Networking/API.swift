@@ -49,8 +49,15 @@ final class HangUpAPI {
     func deleteMyData() async throws { _ = try await request("DELETE", "/api/me", as: Empty.self) }
     func catalog() async throws -> Catalog { try await request("GET", "/api/scenarios") }
 
-    func practice(scenarioId: String?, difficulty: Difficulty?) async throws -> CallSummary {
+    func startPhoneVerification(_ phone: String) async throws {
+        _ = try await request("POST", "/api/me/phone", body: ["phone": phone], as: Empty.self)
+    }
+    func confirmPhone(code: String) async throws -> Me { try await request("POST", "/api/me/phone/verify", body: ["code": code]) }
+    func removePhone() async throws -> Me { try await request("DELETE", "/api/me/phone") }
+
+    func practice(scenarioId: String?, difficulty: Difficulty?, viaPhone: Bool = false) async throws -> CallSummary {
         var body: [String: Any] = [:]
+        if viaPhone { body["via"] = "phone" }
         if let scenarioId { body["scenarioId"] = scenarioId }
         if let difficulty { body["difficulty"] = difficulty.rawValue }
         return try await request("POST", "/api/calls", body: body)
