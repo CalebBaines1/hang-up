@@ -1,4 +1,3 @@
-import type { WebSocket } from "ws";
 import type { ClientMessage, EndReason, ServerMessage, SpeechMode, TranscriptLine } from "@hangup/client";
 import { config } from "./config.ts";
 import { chatStream, type ChatMessage } from "./llm.ts";
@@ -58,6 +57,15 @@ export function mentionsSafeWord(text: string, safeWord: string) {
   return new RegExp(`(^|\\s)${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`).test(norm);
 }
 
+/** The app's WebSocket, or the phone bridge standing in for it. */
+export interface SessionSocket {
+  readonly readyState: number;
+  send(data: string): void;
+  close(): void;
+  on(event: "message", listener: (data: Buffer, isBinary: boolean) => void): unknown;
+  on(event: "close", listener: () => void): unknown;
+}
+
 export class CallSessionHandler {
   private mode: SpeechMode = "browser";
   private messages: ChatMessage[] = [];
@@ -72,13 +80,13 @@ export class CallSessionHandler {
   private persona;
 
   constructor(
-    private ws: WebSocket,
+    private ws: SessionSocket,
     private call: CallRow,
     private device: DeviceRow,
   ) {
     this.scenario = getScenario(call.scenarioId)!;
     this.persona = getPersona(this.scenario.personaId);
-    ws.on("message", (data, isBinary) => this.onMessage(data as Buffer, isBinary));
+    ws.on("message", (data, isBinary) => this.onMessage(Buffer.from(data), isBinary));
     ws.on("close", () => {
       // A socket that closes before "start" leaves the call ringing so the app can reconnect.
       if (!this.ended && this.startedAt) void this.end("disconnected");

@@ -2,7 +2,7 @@
 
 **A scam call trainer.** Hang Up rings you with a realistic AI scam call (a fake bank, a grandchild in trouble, a tax warrant), lets you handle it live by voice, and then a coach tells you in thirty seconds the tell you missed and the earliest moment you could have hung up.
 
-It is a mobile-first, installable web app (PWA). Calls happen inside the app only: Hang Up never places a real phone call and has no phone number field.
+It is a mobile-first, installable web app (PWA) with a native iPhone app. Calls ring inside the app by default. Users can also verify their own phone number to get practice calls as real phone calls (see [Real phone calls](#real-phone-calls)).
 
 > Built for the Nebius x NVIDIA Global AI Hackathon. The live model calls run on **NVIDIA Nemotron via Nebius Token Factory**, and speech runs on **NVIDIA Parakeet**.
 
@@ -24,7 +24,7 @@ Every call makes Token Factory requests at runtime: one streamed Nemotron comple
 1. **Opt in.** Pick a window (say weekday evenings), 1 to 3 calls a week, and a safe word.
 2. **The ring.** A full-screen incoming call with a generic caller ID ("Your Bank", "Unknown"), a ringtone and vibration. It arrives at a random moment inside your window, or right away with "Ring me now".
 3. **The call.** You talk; Parakeet transcribes each utterance; Nemotron answers in character; Kokoro speaks it through a phone-line filter over call-centre or street ambience. You can talk over the caller (barge-in).
-4. **The ending.** You hang up, say your safe word, hand over the "payload" (a code, a card number, agreeing to pay), or the caller gives up after enough firm refusals. Calls are capped at 4 minutes.
+4. **The ending.** You hang up, say your safe word, hand over the "payload" (a code, a card number, agreeing to pay), or the caller gives up after enough firm refusals. Calls are capped at 2 minutes.
 5. **The debrief.** A score out of 100 built from behaviours that actually protect people, a spoken 30-second coach debrief, the biggest tell, what you did well, the one thing to do differently, and the transcript with each red flag marked and a "you could have hung up here" line.
 
 ### Scoring
@@ -39,7 +39,7 @@ Nemotron tags the behaviours; deterministic rules on top (time on the line, time
 | Said they'd call back on the official number | +10 |
 | Asked a verifying question the caller couldn't answer | +5 |
 | Refused to give the code, card or payment | +5 |
-| Stayed on the line past 3 minutes | −10 |
+| Stayed on the line past 90 seconds | −10 |
 | Gave partial personal info | −20 |
 | Gave the scammer what they asked for | −50 |
 
@@ -61,12 +61,24 @@ An adult child can send a parent a surprise practice call, with guardrails:
 
 ## Safety and privacy by design
 
-- **No telephony.** Calls are in-app audio over a WebSocket. Nothing can be pointed at a phone number, so the app is useless to a real scammer.
+- **Only your own number.** In-app calls need no phone number at all. Real phone calls only go to a number its owner verified with an SMS code from their own install, so nobody can point Hang Up at someone else's phone.
 - **Consent first.** Onboarding explains that an AI plays the scammer and that audio is processed on Nebius, and records consent before any call.
 - **Always one tap from out.** A "This is practice · safe word" banner stays on screen for the whole call; tapping it or saying the safe word ends the call with no score.
 - **No real brands, no cloned voices.** Caller IDs are generic, the persona prompt forbids real company names, and voices come from a fixed synthetic library.
 - **Redaction before storage.** Card numbers, SSNs, account numbers, one-time codes (including spoken digits like "four eight two…"), emails and addresses are replaced with tokens like `[CARD]` in memory, before anything is saved or scored. If a real-looking card or account number is caught, the debrief tells the user to call their bank.
 - **Short retention.** Call audio is never written to disk. Transcripts are deleted after 30 days; scores keep only tags and points. "Delete my data" is one tap.
+
+## Real phone calls
+
+Optional. A user who verifies their number in Settings gets practice and surprise calls as ordinary phone calls from a regular number, with no app label on the call screen.
+
+1. **Verify.** `POST /api/me/phone` texts a code through Twilio Verify; `POST /api/me/phone/verify` checks it and saves the number. At most 5 codes an hour per install.
+2. **Dial.** When the call is due, the server asks Twilio to ring the number with answering-machine detection, so voicemail gets a hang-up instead of a pitch.
+3. **Stream.** On answer, Twilio fetches `/api/twilio/voice` (signature-checked), which connects a bidirectional Media Stream to `/api/twilio/stream`. The stream carries a per-call token.
+4. **Talk.** The line's 8 kHz μ-law audio goes to Deepgram Nova-3 for live transcription. Each finished utterance goes to the same session handler the app uses, and the caller's sentences are spoken with ElevenLabs (or the self-hosted speech service, resampled to μ-law) and sent back down the line. Talking over the caller clears queued audio.
+5. **End.** Hanging up the phone counts as hanging up. The safe word, the 2-minute cap and the caller's own exit all end the call from our side. The debrief is waiting in the app.
+
+Settings: `PUBLIC_URL`, `TWILIO_*`, `DEEPGRAM_API_KEY` and `ELEVENLABS_API_KEY` in [`.env.example`](.env.example). Without them the phone option is hidden.
 
 ## Architecture
 
@@ -92,6 +104,7 @@ If the speech service is offline, the app falls back to the browser's built-in s
 ```
 apps/server        Fastify API: WebSocket call session, REST, scheduler, scoring, web push
 apps/web           React PWA (Vite): onboarding, ringing, in-call, debrief, history, family, settings
+apps/ios           Native iPhone app (SwiftUI): CallKit ringing, PushKit VoIP push, echo-cancelled call audio
 packages/client    Shared TypeScript types + REST client + CallSession (works in browsers, Node and React Native)
 services/speech    Python speech service: NVIDIA Parakeet (STT) + Kokoro (TTS) via sherpa-onnx
 ```
@@ -141,17 +154,21 @@ Environment variables are documented in [`.env.example`](.env.example). Keys are
 | POST | `/api/devices` | Register this install, returns a bearer token |
 | GET / PATCH | `/api/me`, `/api/me/settings` | Profile, stats, schedule, safe word, consent |
 | GET | `/api/scenarios` | Scenario and persona library |
-| POST | `/api/calls` | "Ring me now" (optional scenario and difficulty) |
+| POST | `/api/calls` | "Ring me now" (optional scenario, difficulty, and `via: "phone"`) |
 | GET | `/api/calls/ringing` | A scheduled or family call whose time has come |
 | WS | `/api/calls/:id/session` | The live call (protocol in [`packages/client/src/types.ts`](packages/client/src/types.ts)) |
 | GET | `/api/calls`, `/api/calls/:id` | History, transcript, score and debrief |
 | GET | `/api/calls/:id/debrief.wav` | The coach's spoken debrief |
 | POST | `/api/family/link`, `/api/family/parents/:id/calls` | Link with a parent's code, queue a family call |
 | POST | `/api/push/subscribe` | Web Push for "incoming call" notifications |
+| POST | `/api/push/voip` | iPhone app's PushKit token, so calls ring through CallKit (needs `APNS_*` settings) |
+| POST / DELETE | `/api/me/phone`, `/api/me/phone/verify` | Text a code to a number, confirm it, or remove it |
+| POST | `/api/twilio/voice`, `/api/twilio/status` | Twilio webhooks (signature-checked) |
+| WS | `/api/twilio/stream` | Twilio Media Stream for a real phone call |
 
 ## Roadmap
 
-- Native Expo app on the same API and client package
+- iPhone app: shipped as a prototype in [`apps/ios`](apps/ios/README.md); Android with ConnectionService next
 - Live scam alerts via Tavily turned into new practice scenarios
 - Personal and Cold difficulty tiers, supervisor hand-offs with a second voice
 - Weekly family report emails

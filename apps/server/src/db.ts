@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS push_subs (
 );
 `);
 
+// Migrations for databases created before a column existed.
+const callColumns = new Set((db.prepare("PRAGMA table_info(calls)").all() as { name: string }[]).map((c) => c.name));
+if (!callColumns.has("via")) db.exec("ALTER TABLE calls ADD COLUMN via TEXT NOT NULL DEFAULT 'app'");
+
 export function getMeta(key: string): string | undefined {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as { value: string } | undefined;
   return row?.value;

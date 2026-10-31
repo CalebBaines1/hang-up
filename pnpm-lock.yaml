@@ -22,6 +22,9 @@ importers:
       web-push:
         specifier: ^3.6.7
         version: 3.6.7
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
     devDependencies:
       '@hangup/client':
         specifier: workspace:*

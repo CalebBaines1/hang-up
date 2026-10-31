@@ -4,6 +4,7 @@ import type {
   CallResult,
   CallSource,
   CallStatus,
+  CallVia,
   CallSummary,
   Difficulty,
   EndReason,
@@ -25,6 +26,9 @@ export const defaultSettings = (displayName = ""): Settings => ({
   callsPerWeek: 2,
   familyCallsEnabled: false,
   consentedAt: null,
+  phoneNumber: null,
+  phoneVerifiedAt: null,
+  ringPhone: false,
 });
 
 export interface DeviceRow {
@@ -112,6 +116,7 @@ export interface CallRow {
   transcript: TranscriptLine[];
   result: CallResult | null;
   score: number | null;
+  via: CallVia;
   createdAt: string;
 }
 
@@ -132,6 +137,7 @@ function toCall(r: any): CallRow {
     transcript: r.transcript ? JSON.parse(r.transcript) : [],
     result: r.result ? JSON.parse(r.result) : null,
     score: r.score,
+    via: r.via === "phone" ? "phone" : "app",
     createdAt: r.created_at,
   };
 }
@@ -145,12 +151,13 @@ export function createCall(c: {
   ringAt: string;
   senderDeviceId?: string;
   senderName?: string;
+  via?: CallVia;
 }): CallRow {
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO calls(id, device_id, scenario_id, difficulty, status, source, sender_device_id, sender_name, ring_at, created_at)
-     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, c.deviceId, c.scenarioId, c.difficulty, c.status, c.source, c.senderDeviceId ?? null, c.senderName ?? null, c.ringAt, now());
+    `INSERT INTO calls(id, device_id, scenario_id, difficulty, status, source, sender_device_id, sender_name, ring_at, via, created_at)
+     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, c.deviceId, c.scenarioId, c.difficulty, c.status, c.source, c.senderDeviceId ?? null, c.senderName ?? null, c.ringAt, c.via ?? "app", now());
   return getCall(id)!;
 }
 
@@ -159,7 +166,7 @@ export function getCall(id: string): CallRow | null {
   return r ? toCall(r) : null;
 }
 
-export function updateCall(id: string, patch: Partial<Pick<CallRow, "status" | "startedAt" | "endedAt" | "endReason" | "transcript" | "result" | "score" | "ringAt">>) {
+export function updateCall(id: string, patch: Partial<Pick<CallRow, "status" | "startedAt" | "endedAt" | "endReason" | "transcript" | "result" | "score" | "ringAt" | "via">>) {
   const cols: Record<string, string> = {
     status: "status",
     startedAt: "started_at",
@@ -169,6 +176,7 @@ export function updateCall(id: string, patch: Partial<Pick<CallRow, "status" | "
     result: "result",
     score: "score",
     ringAt: "ring_at",
+    via: "via",
   };
   const sets: string[] = [];
   const vals: any[] = [];
@@ -221,6 +229,7 @@ export function summarize(c: CallRow): CallSummary {
     endReason: c.endReason,
     score: c.score,
     durationMs: c.startedAt && c.endedAt ? Date.parse(c.endedAt) - Date.parse(c.startedAt) : null,
+    via: c.via,
   };
 }
 

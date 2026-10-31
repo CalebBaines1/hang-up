@@ -15,7 +15,8 @@
     "@fastify/cors": "^11.3.1",
     "@fastify/websocket": "^11.3.4",
     "fastify": "^5.12.7",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@hangup/client": "workspace:*",

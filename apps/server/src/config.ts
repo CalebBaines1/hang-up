@@ -19,6 +19,30 @@ export const config = {
     privateKey: env.VAPID_PRIVATE_KEY ?? "",
     subject: env.VAPID_SUBJECT ?? "mailto:hello@example.com",
   },
-  maxCallMs: Number(env.MAX_CALL_MS ?? 4 * 60 * 1000),
+  // Native iPhone app: APNs VoIP push (token auth). APNS_KEY is the .p8 file's contents.
+  apns: {
+    key: (env.APNS_KEY ?? "").replace(/\\n/g, "\n"),
+    keyId: env.APNS_KEY_ID ?? "",
+    teamId: env.APNS_TEAM_ID ?? "",
+    bundleId: env.APNS_BUNDLE_ID ?? "",
+  },
+  // Public https URL of this server, used for Twilio webhooks and the media stream.
+  publicUrl: (env.PUBLIC_URL ?? "").replace(/\/$/, ""),
+  // Real phone calls: Twilio places the call and streams its audio to us.
+  twilio: {
+    accountSid: env.TWILIO_ACCOUNT_SID ?? "",
+    authToken: env.TWILIO_AUTH_TOKEN ?? "",
+    fromNumber: env.TWILIO_FROM_NUMBER ?? "",
+    verifyServiceSid: env.TWILIO_VERIFY_SERVICE_SID ?? "",
+  },
+  // Phone speech: Deepgram listens on the line, ElevenLabs speaks (falls back to SPEECH_URL).
+  deepgramApiKey: env.DEEPGRAM_API_KEY ?? "",
+  elevenlabs: {
+    apiKey: env.ELEVENLABS_API_KEY ?? "",
+    model: env.ELEVENLABS_MODEL ?? "eleven_flash_v2_5",
+    femaleVoice: env.ELEVENLABS_VOICE_FEMALE ?? "21m00Tcm4TlvDq8ikWAM",
+    maleVoice: env.ELEVENLABS_VOICE_MALE ?? "pNInz6obpgDQGcFmaJgB",
+  },
+  maxCallMs: Number(env.MAX_CALL_MS ?? 2 * 60 * 1000),
   webDir: env.WEB_DIR ? resolve(env.WEB_DIR) : "",
 };
