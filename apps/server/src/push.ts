@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { sendVoipPush } from "./apns.ts";
 import { config } from "./config.ts";
 import { getMeta, setMeta } from "./db.ts";
 import { deletePushSub, pushSubs } from "./store.ts";
@@ -15,6 +16,16 @@ export const vapidPublicKey = keys!.publicKey;
 
 export async function pushToDevice(deviceId: string, payload: Record<string, unknown>) {
   for (const { endpoint, sub } of pushSubs(deviceId)) {
+    if (sub.kind === "apns-voip") {
+      // Only call pushes go to the iPhone app: every VoIP push must ring.
+      if (typeof payload.callId !== "string") continue;
+      const r = await sendVoipPush(sub.token, sub.sandbox, payload);
+      if (!r.ok) {
+        if (r.gone) deletePushSub(endpoint);
+        else console.error("voip push failed", r.status, r.reason);
+      }
+      continue;
+    }
     try {
       await webpush.sendNotification(sub, JSON.stringify(payload), { TTL: 600, urgency: "high" });
     } catch (err: any) {

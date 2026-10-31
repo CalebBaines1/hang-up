@@ -19,6 +19,13 @@ export const config = {
     privateKey: env.VAPID_PRIVATE_KEY ?? "",
     subject: env.VAPID_SUBJECT ?? "mailto:hello@example.com",
   },
+  // Native iPhone app: APNs VoIP push (token auth). APNS_KEY is the .p8 file's contents.
+  apns: {
+    key: (env.APNS_KEY ?? "").replace(/\\n/g, "\n"),
+    keyId: env.APNS_KEY_ID ?? "",
+    teamId: env.APNS_TEAM_ID ?? "",
+    bundleId: env.APNS_BUNDLE_ID ?? "",
+  },
   maxCallMs: Number(env.MAX_CALL_MS ?? 4 * 60 * 1000),
   webDir: env.WEB_DIR ? resolve(env.WEB_DIR) : "",
 };

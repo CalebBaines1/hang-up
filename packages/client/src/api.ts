@@ -106,6 +106,10 @@ export class HangUpApi {
   subscribePush(subscription: unknown) {
     return this.req<void>("POST", "/api/push/subscribe", { subscription });
   }
+  /** Native iPhone app: register the PushKit VoIP token so calls ring through CallKit. */
+  registerVoip(token: string, sandbox: boolean) {
+    return this.req<{ enabled: boolean }>("POST", "/api/push/voip", { token, sandbox });
+  }
 
   // Family: the parent opts in and shares a code; the family member links with it.
   familyMembers() {

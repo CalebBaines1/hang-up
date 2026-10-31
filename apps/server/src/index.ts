@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import type { Difficulty, FamilyParent, Me, Settings } from "@hangup/client";
 import { config } from "./config.ts";
+import { apnsEnabled } from "./apns.ts";
 import { vapidPublicKey } from "./push.ts";
 import { getScenario, personas, scenarios } from "./scenarios.ts";
 import { hadCallToday, inFailureCooldown, nextDifficulty, randomScenarioId, startScheduler } from "./scheduler.ts";
@@ -246,6 +247,16 @@ app.post("/api/push/subscribe", async (req, reply) => {
   if (!subscription?.endpoint || !/^https:\/\//.test(subscription.endpoint)) return fail(reply, 400, "Invalid subscription");
   store.savePushSub(device.id, subscription as { endpoint: string });
   return reply.code(204).send();
+});
+
+// The native iPhone app registers its PushKit token so scheduled and family calls ring through CallKit.
+app.post("/api/push/voip", async (req, reply) => {
+  const device = auth(req, reply);
+  if (!device) return;
+  const { token, sandbox } = (req.body ?? {}) as { token?: string; sandbox?: boolean };
+  if (!token || !/^[0-9a-f]{64,200}$/i.test(token)) return fail(reply, 400, "Invalid VoIP token");
+  store.savePushSub(device.id, { endpoint: `apns-voip:${token}`, kind: "apns-voip", token, sandbox: Boolean(sandbox) } as { endpoint: string });
+  return reply.code(200).send({ enabled: apnsEnabled() });
 });
 
 // ---- family: parent opts in on their own device, shares a code ----

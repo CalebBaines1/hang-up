@@ -70,6 +70,8 @@ export async function ring(call: CallRow) {
     title: scenario?.callerId ?? "Incoming call",
     body: call.senderName ? `Practice call from ${call.senderName} · Hang Up` : "Incoming practice call · Hang Up",
     callId: call.id,
+    callerId: scenario?.callerId ?? "Unknown",
+    senderName: call.senderName,
     url: `/?ring=${call.id}`,
   });
 }

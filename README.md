@@ -92,6 +92,7 @@ If the speech service is offline, the app falls back to the browser's built-in s
 ```
 apps/server        Fastify API: WebSocket call session, REST, scheduler, scoring, web push
 apps/web           React PWA (Vite): onboarding, ringing, in-call, debrief, history, family, settings
+apps/ios           Native iPhone app (SwiftUI): CallKit ringing, PushKit VoIP push, echo-cancelled call audio
 packages/client    Shared TypeScript types + REST client + CallSession (works in browsers, Node and React Native)
 services/speech    Python speech service: NVIDIA Parakeet (STT) + Kokoro (TTS) via sherpa-onnx
 ```
@@ -148,10 +149,11 @@ Environment variables are documented in [`.env.example`](.env.example). Keys are
 | GET | `/api/calls/:id/debrief.wav` | The coach's spoken debrief |
 | POST | `/api/family/link`, `/api/family/parents/:id/calls` | Link with a parent's code, queue a family call |
 | POST | `/api/push/subscribe` | Web Push for "incoming call" notifications |
+| POST | `/api/push/voip` | iPhone app's PushKit token, so calls ring through CallKit (needs `APNS_*` settings) |
 
 ## Roadmap
 
-- Native Expo app on the same API and client package
+- iPhone app: shipped as a prototype in [`apps/ios`](apps/ios/README.md); Android with ConnectionService next
 - Live scam alerts via Tavily turned into new practice scenarios
 - Personal and Cold difficulty tiers, supervisor hand-offs with a second voice
 - Weekly family report emails
